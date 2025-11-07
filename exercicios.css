@@ -1,0 +1,131 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.topo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #6a0dad;
+  color: #fff;
+  padding: 15px 20px;
+}
+
+.voltar {
+  background-color: #2e8b57;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.lista-exercicios {
+  display: grid;
+  gap: 15px;
+  padding: 20px;
+}
+
+.card-exercicio {
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.card-exercicio h3 {
+  margin: 0 0 5px;
+  color: #6a0dad;
+}
+
+.card-exercicio p {
+  margin: 2px 0;
+  color: #444;
+}
+
+.card-exercicio button {
+  margin-right: 8px;
+  border: none;
+  border-radius: 5px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.editar {
+  background-color: #ffb703;
+  color: #fff;
+}
+
+.excluir {
+  background-color: #d62828;
+  color: #fff;
+}
+
+.btn-flutuante {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background-color: #6a0dad;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  font-size: 28px;
+  cursor: pointer;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 400px;
+}
+
+.modal-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.salvar {
+  background-color: #6a0dad;
+  color: white;
+}
+
+.cancelar {
+  background-color: #ccc;
+  color: #333;
+}
+
+@media (max-width: 600px) {
+  .card-exercicio {
+    font-size: 14px;
+  }
+
+  .btn-flutuante {
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+  }
+}

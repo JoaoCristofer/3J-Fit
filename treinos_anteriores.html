@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Treinos Anteriores</title>
+  <link rel="stylesheet" href="treinos_anteriores.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topo">
+    <h1>Treinos Anteriores</h1>
+    <a id="voltar" href="#" class="btn-voltar">Voltar</a>
+  </header>
+
+  <main class="container">
+    <div id="status" class="status"></div>
+    <div id="listaTreinos"></div>
+  </main>
+
+  <!-- Modal de edição de treino -->
+  <div id="modalEditar" class="modal">
+    <div class="modal-card">
+      <h2>Editar Treino</h2>
+      <form id="formEditar">
+        <input type="hidden" id="edit_id_treino">
+        <label>Data:</label>
+        <input type="date" id="edit_data_treino" required>
+        <label>Observações gerais:</label>
+        <textarea id="edit_observacoes_gerais"></textarea>
+
+        <div id="edit_exercicios_container"></div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn primary">Salvar</button>
+          <button type="button" id="fecharModal" class="btn secondary">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="treinos_anteriores.js"></script>
+</body>
+</html>

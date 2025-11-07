@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Novo Treino - 3JFit</title>
+  <link rel="stylesheet" href="novo_treino.css" />
+</head>
+<body>
+  <header class="topo">
+    <h1>Novo Treino</h1>
+  </header>
+
+  <main class="container">
+    <div class="meta">
+      <label>Aluno ID: <span id="alunoIdDisplay"></span></label>
+      <label>Data:
+        <input type="date" id="dataTreino" />
+      </label>
+    </div>
+
+    <label>Observações gerais (opcional)</label>
+    <textarea id="observacoesGerais" placeholder="Ex: foco em resistência"></textarea>
+
+    <h2>Exercícios</h2>
+    <div id="exerciciosWrapper"></div>
+
+    <div class="acoes">
+      <button id="btnAddEx" class="btn">+ Adicionar exercício</button>
+      <button id="btnSalvar" class="btn primary">Salvar treino</button>
+      <button id="btnCancelar" class="btn secondary">Cancelar</button>
+    </div>
+
+    <p id="status" class="status"></p>
+  </main>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="novo_treino.js"></script>
+</body>
+</html>

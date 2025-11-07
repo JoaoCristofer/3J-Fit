@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalhes do Aluno - 3JFit</title>
+  <link rel="stylesheet" href="aluno_detalhe.css">
+</head>
+<body>
+
+  <header class="topo">
+    <h1>Detalhes do Aluno</h1>
+    <button class="voltar" onclick="window.location.href='alunos.html'">Voltar</button>
+  </header>
+
+  <main class="detalhes-container">
+    <div id="infoAluno" class="info-aluno">
+      <!-- As informações do aluno vão aparecer aqui -->
+    </div>
+
+    <div class="acoes">
+      <button id="btnEditar">✏️ Editar</button>
+      <button id="btnExcluir">🗑️ Excluir</button>
+      <button id="btnNovoTreino">🏋️ Novo Treino</button>
+      <button id="btnDesempenho">📊 Desempenho</button>
+      <button id="btnTreinos">📅 Treinos Anteriores</button>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="aluno_detalhe.js"></script>
+</body>
+</html>

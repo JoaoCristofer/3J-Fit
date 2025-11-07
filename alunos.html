@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alunos - 3JFit</title>
+  <link rel="stylesheet" href="alunos.css" />
+</head>
+<body>
+
+  <header class="topo">
+    <h1>Alunos</h1>
+    <button id="btnVoltar">Voltar</button>
+  </header>
+
+  <main class="conteudo">
+    <section id="listaAlunos" class="lista-alunos">
+      <!-- Lista carregada dinamicamente -->
+    </section>
+  </main>
+
+  <button id="btnNovoAluno" class="btn-flutuante">+ Novo Aluno</button>
+
+  <!-- Modal -->
+  <div id="modalAluno" class="modal">
+    <div class="modal-content">
+      <h2>Novo Aluno</h2>
+      <form id="formAluno">
+        <input type="text" id="nome" placeholder="Nome" required />
+        <input type="number" id="idade" placeholder="Idade" />
+        <select id="sexo">
+          <option value="">Sexo</option>
+          <option value="Masculino">Masculino</option>
+          <option value="Feminino">Feminino</option>
+        </select>
+        <textarea id="informacoes" placeholder="Informações pertinentes"></textarea>
+
+        <div class="modal-actions">
+          <button type="submit" class="salvar">Salvar</button>
+          <button type="button" id="fecharModal" class="cancelar">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="alunos.js"></script>
+</body>
+</html>

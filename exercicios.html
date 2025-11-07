@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exercícios - 3JFit</title>
+  <link rel="stylesheet" href="exercicios.css" />
+</head>
+<body>
+  <header class="topo">
+    <h1>Exercícios</h1>
+    <button class="voltar" onclick="window.location.href='index.html'">Voltar</button>
+  </header>
+
+  <main>
+    <section id="listaExercicios" class="lista-exercicios"></section>
+  </main>
+
+  <button id="btnNovoExercicio" class="btn-flutuante">+ Novo Exercício</button>
+
+  <!-- Modal -->
+  <div id="modalExercicio" class="modal">
+    <div class="modal-content">
+      <h2 id="tituloModal">Novo Exercício</h2>
+      <form id="formExercicio">
+        <input type="hidden" id="id_exercicio">
+        <input type="text" id="nome_exercicio" placeholder="Nome do exercício" required>
+        <input type="text" id="grupo_muscular" placeholder="Grupo muscular (opcional)">
+        <textarea id="descricao" placeholder="Descrição (opcional)"></textarea>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn salvar">Salvar</button>
+          <button type="button" id="fecharModal" class="btn cancelar">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="exercicios.js"></script>
+</body>
+</html>

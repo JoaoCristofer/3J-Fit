@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Desempenho</title>
+  <link rel="stylesheet" href="desempenho.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <header class="topo"><h1>Desempenho</h1></header>
+  <main class="container">
+    <div id="status" class="status"></div>
+
+    <label>Exercício:
+      <select id="selectEx"></select>
+    </label>
+
+    <canvas id="chart" style="width:100%;height:320px;margin-top:12px"></canvas>
+
+    <a id="voltar" class="btn-voltar" href="#">Voltar</a>
+  </main>
+
+  <script src="desempenho.js"></script>
+</body>
+</html>
