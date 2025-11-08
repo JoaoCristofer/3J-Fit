@@ -5,7 +5,7 @@ body {
 }
 
 .topo {
-  background-color: #111;
+  background-color: #460062;
   color: white;
   display: flex;
   justify-content: space-between;
@@ -14,7 +14,7 @@ body {
 }
 
 .voltar {
-  background: #ff6600;
+  background: #007a1c;
   border: none;
   color: white;
   padding: 8px 14px;
@@ -46,7 +46,7 @@ body {
 }
 
 .acoes button {
-  background: #222;
+  background: #007a1c;
   color: white;
   border: none;
   padding: 10px 16px;
@@ -55,5 +55,5 @@ body {
 }
 
 .acoes button:hover {
-  background: #ff6600;
+  background: #007a1c;
 }

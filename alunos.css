@@ -5,7 +5,7 @@ body {
 }
 
 .topo {
-  background: #111;
+  background: #49007a;
   color: white;
   display: flex;
   justify-content: space-between;
@@ -14,7 +14,7 @@ body {
 }
 
 .topo button {
-  background: #ff6600;
+  background: #056e00;
   border: none;
   color: white;
   padding: 8px 14px;
@@ -48,7 +48,7 @@ body {
 }
 
 .card-aluno button {
-  background: #222;
+  background: #007a1c;
   color: white;
   border: none;
   border-radius: 5px;
@@ -62,15 +62,14 @@ body {
 
 .btn-flutuante {
   position: fixed;
-  bottom: 25px;
-  right: 25px;
-  background: #ff6600;
+  bottom: 0px;
+  background: #460062;
   color: white;
   border: none;
-  border-radius: 50%;
-  width: 55px;
-  height: 55px;
-  font-size: 24px;
+  border-radius: 3%;
+  width: 100%;
+  height: 60px;
+  font-size: 18px;
   cursor: pointer;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
