@@ -35,11 +35,12 @@ async function carregarExerciciosDoAluno() {
   }
 
   // pegar exercícios usados pelo aluno
-  const { data: used, error: errU } = await supabase
-    .from("treino_exercicio")
-    .select("id_exercicio_fk")
-    .in("id_treino_fk", treinoIds)
-    .distinct("id_exercicio_fk");
+const { data: used, error: errU } = await supabase
+  .from("treino_exercicio")
+  .select("id_exercicio_fk", { distinct: true })
+  .in("id_treino_fk", treinoIds);
+
+
 
   if (errU) { console.error(errU); statusEl.textContent = "Erro ao carregar exercícios."; return; }
 
