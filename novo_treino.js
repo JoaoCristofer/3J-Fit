@@ -1,241 +1,270 @@
 // novo_treino.js — simples, robusto e com o esquema correto
 import { supabase } from "./supabase.js";
 
-// elements
-const params = new URLSearchParams(window.location.search);
-const alunoId = params.get("id"); // URL ?id=...
-document.getElementById("alunoIdDisplay").textContent = alunoId || "—";
-const dataTreinoInput = document.getElementById("dataTreino");
-const observacoesGeraisEl = document.getElementById("observacoesGerais");
-const exerciciosWrapper = document.getElementById("exerciciosWrapper");
-const btnAddEx = document.getElementById("btnAddEx");
-const btnSalvar = document.getElementById("btnSalvar");
-const btnCancelar = document.getElementById("btnCancelar");
-const statusEl = document.getElementById("status");
+document.addEventListener("DOMContentLoaded", () => {
 
-if (!alunoId) {
-  statusEl.textContent = "Aluno não informado na URL (?id=...).";
-  btnAddEx.disabled = true;
-  btnSalvar.disabled = true;
-}
+  // =========================
+  // ELEMENTOS / PARAMS
+  // =========================
+  const params = new URLSearchParams(window.location.search);
+  const alunoId = params.get("id");
 
-// default date = today (YYYY-MM-DD)
-(function setToday(){
-  const d = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  const s = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  dataTreinoInput.value = s;
-})();
+  const alunoIdDisplay = document.getElementById("alunoIdDisplay");
+  const dataTreinoInput = document.getElementById("dataTreino");
+  const observacoesGeraisEl = document.getElementById("observacoesGerais");
+  const exerciciosWrapper = document.getElementById("exerciciosWrapper");
+  const btnAddEx = document.getElementById("btnAddEx");
+  const btnSalvar = document.getElementById("btnSalvar");
+  const btnCancelar = document.getElementById("btnCancelar");
+  const statusEl = document.getElementById("status");
+console.log({
+  alunoIdDisplay,
+  dataTreinoInput,
+  observacoesGeraisEl,
+  exerciciosWrapper,
+  btnAddEx,
+  btnSalvar,
+  btnCancelar,
+  statusEl
+});
 
-// load exercises catalog from Supabase
-let catalog = [];
-async function loadCatalog(){
-  statusEl.textContent = "Carregando catálogo de exercícios...";
-  const { data, error } = await supabase
-    .from("exercicios")
-    .select("id_exercicio,nome_exercicio")
-    .order("nome_exercicio", { ascending: true });
-
-  if (error) {
-    console.error("Erro ao buscar exercícios:", error);
-    statusEl.textContent = "Erro ao carregar exercícios (veja console).";
+  // defesa básica
+  if (
+    !alunoIdDisplay ||
+    !dataTreinoInput ||
+    !observacoesGeraisEl ||
+    !exerciciosWrapper ||
+    !btnAddEx ||
+    !btnSalvar ||
+    !btnCancelar ||
+    !statusEl
+  ) {
+    console.error("Elementos do DOM não encontrados");
     return;
   }
-  catalog = data || [];
-  statusEl.textContent = "";
-  if (catalog.length === 0) statusEl.textContent = "Nenhum exercício cadastrado. Vá em Exercícios e crie alguns.";
-}
 
-// helper: create one exercise block (select + series list)
-function createExerciseBlock() {
-  const exBlock = document.createElement("div");
-  exBlock.className = "ex-block";
+  alunoIdDisplay.textContent = alunoId || "—";
 
-  // header with select and remove button
-  const header = document.createElement("div");
-  header.className = "ex-header";
+  if (!alunoId) {
+    statusEl.textContent = "Aluno não informado na URL (?id=...).";
+    btnAddEx.disabled = true;
+    btnSalvar.disabled = true;
+  }
 
-  const select = document.createElement("select");
-  select.innerHTML = `<option value="">-- selecione um exercício --</option>`;
-  catalog.forEach(e => {
-    const opt = document.createElement("option");
-    opt.value = e.id_exercicio;
-    opt.textContent = e.nome_exercicio;
-    select.appendChild(opt);
+  // =========================
+  // DATA PADRÃO (HOJE)
+  // =========================
+  function setToday() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    dataTreinoInput.value =
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  }
+
+  setToday();
+
+  // =========================
+  // CATÁLOGO DE EXERCÍCIOS
+  // =========================
+  let catalog = [];
+
+  async function loadCatalog() {
+    statusEl.textContent = "Carregando catálogo de exercícios...";
+
+    const { data, error } = await supabase
+      .from("exercicios")
+      .select("id_exercicio, nome_exercicio")
+      .order("nome_exercicio", { ascending: true });
+
+    if (error) {
+      console.error("Erro ao buscar exercícios:", error);
+      statusEl.textContent = "Erro ao carregar exercícios (veja console).";
+      return;
+    }
+
+    catalog = data || [];
+    statusEl.textContent = "";
+
+    if (catalog.length === 0) {
+      statusEl.textContent =
+        "Nenhum exercício cadastrado. Vá em Exercícios e crie alguns.";
+    }
+  }
+
+  // =========================
+  // BLOCO DE EXERCÍCIO
+  // =========================
+  function createExerciseBlock() {
+    const exBlock = document.createElement("div");
+    exBlock.className = "ex-block";
+
+    const header = document.createElement("div");
+    header.className = "ex-header";
+
+    const select = document.createElement("select");
+    select.innerHTML =
+      `<option value="">-- selecione um exercício --</option>`;
+
+    catalog.forEach(e => {
+      const opt = document.createElement("option");
+      opt.value = e.id_exercicio;
+      opt.textContent = e.nome_exercicio;
+      select.appendChild(opt);
+    });
+
+    const removeExBtn = document.createElement("button");
+    removeExBtn.type = "button";
+    removeExBtn.className = "ex-remove btn-small";
+    removeExBtn.textContent = "Remover exercício";
+    removeExBtn.onclick = () => exBlock.remove();
+
+    header.appendChild(select);
+    header.appendChild(removeExBtn);
+    exBlock.appendChild(header);
+
+    const seriesList = document.createElement("div");
+    seriesList.className = "series-list";
+
+    function addSeriesRow(cargaVal = "", repsVal = "", obsVal = "") {
+      const row = document.createElement("div");
+      row.className = "series-row";
+
+      const carga = document.createElement("input");
+      carga.type = "number";
+      carga.placeholder = "Carga (kg)";
+      carga.value = cargaVal;
+
+      const reps = document.createElement("input");
+      reps.type = "number";
+      reps.placeholder = "Repetições";
+      reps.value = repsVal;
+
+      const obs = document.createElement("textarea");
+      obs.placeholder = "Observações (opcional)";
+      obs.rows = 1;
+      obs.value = obsVal;
+
+      const btnRem = document.createElement("button");
+      btnRem.type = "button";
+      btnRem.className = "remove btn-small";
+      btnRem.textContent = "Remover série";
+      btnRem.onclick = () => row.remove();
+
+      row.append(carga, reps, obs, btnRem);
+      seriesList.appendChild(row);
+    }
+
+    addSeriesRow();
+
+    const addSeriesBtn = document.createElement("button");
+    addSeriesBtn.type = "button";
+    addSeriesBtn.className = "add-series btn-small";
+    addSeriesBtn.textContent = "+ Série";
+    addSeriesBtn.onclick = () => addSeriesRow();
+
+    exBlock.append(seriesList, addSeriesBtn);
+    exerciciosWrapper.appendChild(exBlock);
+
+    return exBlock;
+  }
+
+  // =========================
+  // EVENTOS
+  // =========================
+  btnAddEx.addEventListener("click", () => {
+    if (catalog.length === 0) {
+      alert("Nenhum exercício cadastrado. Crie exercícios primeiro.");
+      return;
+    }
+    createExerciseBlock();
   });
 
-  const removeExBtn = document.createElement("button");
-  removeExBtn.type = "button";
-  removeExBtn.className = "ex-remove btn-small";
-  removeExBtn.textContent = "Remover exercício";
-  removeExBtn.onclick = () => exBlock.remove();
-
-  header.appendChild(select);
-  header.appendChild(removeExBtn);
-  exBlock.appendChild(header);
-
-  // series container
-  const seriesList = document.createElement("div");
-  seriesList.className = "series-list";
-
-  // function to add one series row
-  function addSeriesRow(cargaVal = "", repsVal = "", obsVal = "") {
-    const row = document.createElement("div");
-    row.className = "series-row";
-
-    const carga = document.createElement("input");
-    carga.type = "number";
-    carga.placeholder = "Carga (kg)";
-    carga.value = cargaVal;
-
-    const reps = document.createElement("input");
-    reps.type = "number";
-    reps.placeholder = "Repetições";
-    reps.value = repsVal;
-
-    const obs = document.createElement("textarea");
-    obs.placeholder = "Observações (opcional)";
-    obs.rows = 1;
-    obs.value = obsVal;
-
-    const btnRem = document.createElement("button");
-    btnRem.type = "button";
-    btnRem.className = "remove btn-small";
-    btnRem.textContent = "Remover série";
-    btnRem.onclick = () => row.remove();
-
-    row.appendChild(carga);
-    row.appendChild(reps);
-    row.appendChild(obs);
-    row.appendChild(btnRem);
-
-    seriesList.appendChild(row);
-  }
-
-  // add initial series
-  addSeriesRow();
-
-  // add-series button
-  const addSeriesBtn = document.createElement("button");
-  addSeriesBtn.type = "button";
-  addSeriesBtn.className = "add-series btn-small";
-  addSeriesBtn.textContent = "+ Série";
-  addSeriesBtn.onclick = () => addSeriesRow();
-
-  exBlock.appendChild(seriesList);
-  exBlock.appendChild(addSeriesBtn);
-
-  exerciciosWrapper.appendChild(exBlock);
-  return exBlock;
-}
-
-// add-first when catalog loaded
-btnAddEx.addEventListener("click", () => {
-  if (catalog.length === 0) {
-    alert("Nenhum exercício cadastrado. Crie exercícios primeiro.");
-    return;
-  }
-  createExerciseBlock();
-});
-
-btnCancelar.addEventListener("click", () => {
-  // go back to aluno detail if id present
-  if (alunoId) window.location.href = `aluno_detalhe.html?id=${alunoId}`;
-  else history.back();
-});
-
-// save handler: create treino then treino_exercicio records
-btnSalvar.addEventListener("click", async () => {
-  try {
-    statusEl.textContent = "Salvando treino...";
-    btnSalvar.disabled = true;
-
-    if (!alunoId) throw new Error("id do aluno não informado na URL.");
-
-    const data_treino = dataTreinoInput.value;
-    const observacoes_gerais = observacoesGeraisEl.value || null;
-
-    // create treino
-    const { data: treinoData, error: errT } = await supabase
-      .from("treinos")
-      .insert([{ id_aluno_fk: alunoId, data_treino, observacoes_gerais }])
-      .select()
-      .single();
-
-    if (errT) {
-      console.error(errT);
-      throw new Error("Erro ao criar treino: " + errT.message);
+  btnCancelar.addEventListener("click", () => {
+    if (alunoId) {
+      window.location.href = `aluno_detalhe.html?id=${alunoId}`;
+    } else {
+      history.back();
     }
-    const id_treino = treinoData.id_treino;
+  });
 
-    // build inserts for treino_exercicio
-    const blocks = Array.from(document.querySelectorAll(".ex-block"));
-    const inserts = [];
+  btnSalvar.addEventListener("click", async () => {
+    try {
+      statusEl.textContent = "Salvando treino...";
+      btnSalvar.disabled = true;
 
-    for (const block of blocks) {
-      const selet = block.querySelector("select");
-      const id_exercicio_fk = selet ? Number(selet.value) : null;
-      if (!id_exercicio_fk) {
-        // skip blocks without selected exercise
-        continue;
-      }
+      if (!alunoId) throw new Error("ID do aluno não informado na URL.");
 
-      const seriesRows = Array.from(block.querySelectorAll(".series-row"));
-      for (let i = 0; i < seriesRows.length; i++) {
-        const row = seriesRows[i];
-        const cargaRaw = row.querySelector("input[type='number']").value;
-        const repsRaw = row.querySelectorAll("input[type='number']")[1].value;
-        const obs = row.querySelector("textarea").value || null;
+      const data_treino = dataTreinoInput.value;
+      const observacoes_gerais = observacoesGeraisEl.value || null;
 
-        const carga = cargaRaw === "" ? null : Number(cargaRaw);
-        const repeticoes = repsRaw === "" ? null : Number(repsRaw);
+      const { data: treinoData, error: errT } = await supabase
+        .from("treinos")
+        .insert([{ id_aluno_fk: Number(alunoId), data_treino, observacoes_gerais }])
+        .select()
+        .single();
 
-        inserts.push({
-          id_treino_fk: id_treino,
-          id_exercicio_fk,
-          carga,
-          repeticoes,
-          series: i + 1,
-          unidade: 'kg',
-          observacoes: obs
+      if (errT) throw errT;
+
+      const id_treino = treinoData.id_treino;
+      const inserts = [];
+
+      document.querySelectorAll(".ex-block").forEach(block => {
+        const select = block.querySelector("select");
+        const id_exercicio_fk = Number(select.value);
+        if (!id_exercicio_fk) return;
+
+        block.querySelectorAll(".series-row").forEach((row, i) => {
+          const inputs = row.querySelectorAll("input[type='number']");
+          const carga = inputs[0].value ? Number(inputs[0].value) : null;
+          const repeticoes = inputs[1].value ? Number(inputs[1].value) : null;
+          const obs = row.querySelector("textarea").value || null;
+
+          inserts.push({
+            id_treino_fk: id_treino,
+            id_exercicio_fk,
+            carga,
+            repeticoes,
+            series: i + 1,
+            unidade: "kg",
+            observacoes: obs
+          });
         });
+      });
+
+      if (inserts.length === 0) {
+        await supabase.from("treinos").delete().eq("id_treino", id_treino);
+        throw new Error("Adicione pelo menos uma série antes de salvar.");
       }
-    }
 
-    if (inserts.length === 0) {
-      // nothing to insert -> rollback: delete created treino
-      await supabase.from("treinos").delete().eq("id_treino", id_treino);
-      throw new Error("Nenhuma série adicionada. Adicione pelo menos uma série antes de salvar.");
-    }
+      const { error: errInsert } =
+        await supabase.from("treino_exercicio").insert(inserts);
 
-    // bulk insert
-    const { error: errInsert } = await supabase.from("treino_exercicio").insert(inserts);
-    if (errInsert) {
-      console.error(errInsert);
-      // try rollback treino
-      await supabase.from("treinos").delete().eq("id_treino", id_treino);
-      throw new Error("Erro ao salvar séries: " + errInsert.message);
-    }
+      if (errInsert) {
+        await supabase.from("treinos").delete().eq("id_treino", id_treino);
+        throw errInsert;
+      }
 
-    statusEl.textContent = "Treino salvo com sucesso!";
-    setTimeout(() => {
-      window.location.href = `treinos_anteriores.html?id=${alunoId}`;
-    }, 700);
-  } catch (err) {
-    console.error(err);
-    alert(err.message || "Erro ao salvar treino (veja console).");
-    statusEl.textContent = "";
-    btnSalvar.disabled = false;
-  }
+      statusEl.textContent = "Treino salvo com sucesso!";
+      setTimeout(() => {
+        window.location.href = `treinos_anteriores.html?id=${alunoId}`;
+      }, 700);
+
+    } catch (err) {
+      console.error(err);
+      alert(err.message || "Erro ao salvar treino.");
+      statusEl.textContent = "";
+      btnSalvar.disabled = false;
+    }
+  });
+
+  // =========================
+  // INIT
+  // =========================
+  (async function init() {
+    await loadCatalog();
+    if (catalog.length) {
+      createExerciseBlock();
+    }
+  })();
+
 });
-
-// init
-(async function init(){
-  await loadCatalog();
-  if (catalog.length) {
-    // create one block by default
-    createExerciseBlock();
-  } else {
-    statusEl.textContent = "Nenhum exercício cadastrado — crie exercícios primeiro.";
-  }
-})();
