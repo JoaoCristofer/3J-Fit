@@ -1,18 +1,28 @@
-// treinos_anteriores.js
 import { supabase } from "./supabase.js";
+import { getAlunoAtual, setAlunoAtual } from "./alunoContext.js";
 
 document.addEventListener("DOMContentLoaded", () => {
 
   // =========================
-  // PARAMS + SANITIZAÇÃO
+  // PARAMS + CONTEXTO
   // =========================
   const params = new URLSearchParams(window.location.search);
-  const alunoIdRaw = params.get("id");
+  const alunoIdUrl = params.get("id");
+  const alunoIdStorage = getAlunoAtual();
 
   const alunoId =
-    alunoIdRaw && alunoIdRaw !== "null" && !isNaN(alunoIdRaw)
-      ? Number(alunoIdRaw)
-      : null;
+    alunoIdUrl && !isNaN(alunoIdUrl)
+      ? Number(alunoIdUrl)
+      : alunoIdStorage;
+
+  if (!alunoId) {
+    alert("Aluno inválido.");
+    return;
+  }
+
+  if (alunoIdUrl && !isNaN(alunoIdUrl)) {
+    setAlunoAtual(Number(alunoIdUrl));
+  }
 
   // =========================
   // ELEMENTOS DOM
@@ -20,31 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const listaTreinos = document.getElementById("listaTreinos");
   const statusEl = document.getElementById("status");
   const voltar = document.getElementById("voltar");
+
   const modal = document.getElementById("modalEditar");
   const fecharModal = document.getElementById("fecharModal");
   const formEditar = document.getElementById("formEditar");
   const editContainer = document.getElementById("edit_exercicios_container");
 
-  // defesa DOM
-  if (
-    !listaTreinos ||
-    !statusEl ||
-    !voltar ||
-    !modal ||
-    !fecharModal ||
-    !formEditar ||
-    !editContainer
-  ) {
-    console.error("Elementos do DOM não encontrados");
-    return;
-  }
-
-  // defesa ID
-  if (!alunoId) {
-    statusEl.textContent = "Aluno inválido ou não informado na URL (?id=...).";
-    return;
-  }
-
+  // =========================
+  // VOLTAR
+  // =========================
   voltar.onclick = (e) => {
     e.preventDefault();
     history.back();
@@ -58,32 +52,29 @@ document.addEventListener("DOMContentLoaded", () => {
       statusEl.textContent = "Carregando treinos...";
       listaTreinos.innerHTML = "";
 
-      const { data: treinos, error: errT } = await supabase
+      const { data: treinos, error } = await supabase
         .from("treinos")
         .select("id_treino,id_aluno_fk,data_treino,observacoes_gerais,created_at")
         .eq("id_aluno_fk", alunoId)
-        .order("data_treino", { ascending: false });
+        .order("data_treino", { ascending: false })
+        .order("created_at", { ascending: false });
 
-      if (errT) throw errT;
+      if (error) throw error;
 
-      if (!treinos || treinos.length === 0) {
+      if (!treinos.length) {
         statusEl.textContent = "Nenhum treino encontrado.";
         return;
       }
 
       const treinoIds = treinos.map(t => t.id_treino);
 
-      const { data: seriesAll, error: errS } = await supabase
+      const { data: seriesAll } = await supabase
         .from("treino_exercicio")
         .select("*")
         .in("id_treino_fk", treinoIds)
         .order("id_treino_exercicio", { ascending: true });
 
-      if (errS) throw errS;
-
-      const exercIds = Array.from(
-        new Set((seriesAll || []).map(s => s.id_exercicio_fk))
-      ).filter(Boolean);
+      const exercIds = [...new Set(seriesAll.map(s => s.id_exercicio_fk))];
 
       let exercMap = {};
       if (exercIds.length) {
@@ -92,13 +83,11 @@ document.addEventListener("DOMContentLoaded", () => {
           .select("id_exercicio,nome_exercicio")
           .in("id_exercicio", exercIds);
 
-        (exs || []).forEach(x => {
-          exercMap[x.id_exercicio] = x.nome_exercicio;
-        });
+        exs.forEach(e => exercMap[e.id_exercicio] = e.nome_exercicio);
       }
 
       const seriesPorTreino = {};
-      (seriesAll || []).forEach(s => {
+      seriesAll.forEach(s => {
         if (!seriesPorTreino[s.id_treino_fk]) {
           seriesPorTreino[s.id_treino_fk] = [];
         }
@@ -111,240 +100,284 @@ document.addEventListener("DOMContentLoaded", () => {
         const div = document.createElement("div");
         div.className = "card";
 
-        let inner = `
+        let html = `
           <h3>${new Date(t.data_treino).toLocaleDateString("pt-BR")}</h3>
           <div class="meta">Criado: ${new Date(t.created_at).toLocaleString()}</div>
         `;
 
         if (t.observacoes_gerais) {
-          inner += `<p><strong>Obs:</strong> ${t.observacoes_gerais}</p>`;
+          html += `<p><strong>Obs:</strong> ${t.observacoes_gerais}</p>`;
         }
 
-        const s = seriesPorTreino[t.id_treino] || [];
+        const series = seriesPorTreino[t.id_treino] || [];
 
-        if (s.length === 0) {
-          inner += `<p class="detail-list">Nenhum exercício registrado.</p>`;
-        } else {
-          const porEx = {};
-          s.forEach(row => {
-            if (!porEx[row.id_exercicio_fk]) porEx[row.id_exercicio_fk] = [];
-            porEx[row.id_exercicio_fk].push(row);
-          });
+        let ultimoEx = null;
+        html += `<div class="detail-list">`;
 
-          inner += `<div class="detail-list">`;
-          for (const exId in porEx) {
-            inner += `<div class="ex-block"><strong>${exercMap[exId] || "Ex " + exId}</strong>`;
-            porEx[exId].forEach((ser, idx) => {
-              inner += `
-                <div>
-                  Série ${ser.series || idx + 1}:
-                  ${ser.repeticoes ?? "-"} reps •
-                  ${ser.carga ?? "-"} ${ser.unidade ?? ""}
-                </div>
-              `;
-              if (ser.observacoes) {
-                inner += `<small>${ser.observacoes}</small>`;
-              }
-            });
-            inner += `</div>`;
+        series.forEach((row, idx) => {
+          if (row.id_exercicio_fk !== ultimoEx) {
+            if (ultimoEx !== null) html += `</div>`;
+            html += `<div class="ex-block"><strong>${exercMap[row.id_exercicio_fk]}</strong>`;
+            ultimoEx = row.id_exercicio_fk;
           }
-          inner += `</div>`;
-        }
 
-        inner += `
+          html += `
+            <div>
+              Série ${row.series ?? idx + 1}:
+              ${row.repeticoes ?? "-"} reps •
+              ${row.carga ?? "-"} ${row.unidade ?? ""}
+            </div>
+          `;
+
+          if (row.observacoes) {
+            html += `<small>${row.observacoes}</small>`;
+          }
+        });
+
+        html += `</div></div>`;
+
+        html += `
           <div class="botao-grupo">
             <button class="btn primary" onclick="abrirEditar(${t.id_treino})">Editar</button>
             <button class="btn secondary" onclick="excluirTreino(${t.id_treino})">Excluir</button>
           </div>
         `;
 
-        div.innerHTML = inner;
+        div.innerHTML = html;
         listaTreinos.appendChild(div);
       });
 
     } catch (err) {
       console.error(err);
-      statusEl.textContent = "Erro ao carregar treinos (veja console).";
+      statusEl.textContent = "Erro ao carregar treinos.";
     }
   }
 
   // =========================
-  // EDITAR (AGORA COM "ADICIONAR EXERCÍCIO")
+  // ABRIR EDITAR
   // =========================
-  window.abrirEditar = async function (idTreino) {
-    try {
-      const { data: t, error: et } = await supabase
-        .from("treinos")
-        .select("*")
-        .eq("id_treino", idTreino)
-        .single();
+window.abrirEditar = async function (idTreino) {
+  try {
+    const { data: treino } = await supabase
+      .from("treinos")
+      .select("*")
+      .eq("id_treino", idTreino)
+      .single();
 
-      if (et) throw et;
+    document.getElementById("edit_id_treino").value = treino.id_treino;
+    document.getElementById("edit_data_treino").value = treino.data_treino;
+    document.getElementById("edit_observacoes_gerais").value =
+      treino.observacoes_gerais || "";
 
-      document.getElementById("edit_id_treino").value = t.id_treino;
-      document.getElementById("edit_data_treino").value = t.data_treino;
-      document.getElementById("edit_observacoes_gerais").value = t.observacoes_gerais || "";
+    editContainer.innerHTML = "";
 
-      editContainer.innerHTML = "";
+    const { data: series } = await supabase
+      .from("treino_exercicio")
+      .select("*")
+      .eq("id_treino_fk", idTreino)
+      .order("id_treino_exercicio", { ascending: true });
 
-      const { data: series, error: es } = await supabase
-        .from("treino_exercicio")
-        .select("*")
-        .eq("id_treino_fk", idTreino)
-        .order("series", { ascending: true });
+    // 🔥 buscar nomes dos exercícios
+    const exIds = [...new Set(series.map(s => s.id_exercicio_fk))];
 
-      if (es) throw es;
+    let exMap = {};
+    if (exIds.length) {
+      const { data: exs } = await supabase
+        .from("exercicios")
+        .select("id_exercicio,nome_exercicio")
+        .in("id_exercicio", exIds);
 
-      const exIds = Array.from(new Set((series || []).map(s => s.id_exercicio_fk))).filter(Boolean);
-      let exMap = {};
+      exs.forEach(e => (exMap[e.id_exercicio] = e.nome_exercicio));
+    }
 
-      if (exIds.length) {
-        const { data: exs } = await supabase
-          .from("exercicios")
-          .select("id_exercicio,nome_exercicio")
-          .in("id_exercicio", exIds);
+    const grouped = {};
+    series.forEach(s => {
+      if (!grouped[s.id_exercicio_fk]) grouped[s.id_exercicio_fk] = [];
+      grouped[s.id_exercicio_fk].push(s);
+    });
 
-        (exs || []).forEach(x => exMap[x.id_exercicio] = x.nome_exercicio);
-      }
+    // =========================
+    // EXERCÍCIOS EXISTENTES
+    // =========================
+    for (const idEx in grouped) {
+      const bloco = document.createElement("div");
+      bloco.className = "ex-edit";
+      bloco.dataset.idEx = idEx;
 
-      const grouped = {};
-      (series || []).forEach(s => {
-        if (!grouped[s.id_exercicio_fk]) grouped[s.id_exercicio_fk] = [];
-        grouped[s.id_exercicio_fk].push(s);
+      bloco.innerHTML = `
+        <strong>${exMap[idEx] || "Exercício #" + idEx}</strong>
+        <div class="series-edit-list"></div>
+        <button type="button" class="add-serie-btn">+ Série</button>
+      `;
+
+      const list = bloco.querySelector(".series-edit-list");
+
+      grouped[idEx].forEach(s => {
+        const row = document.createElement("div");
+        row.className = "series-row";
+        row.innerHTML = `
+          <label>Peso (kg)</label>
+          <input class="edit-carga" type="number" value="${s.carga ?? ""}">
+
+          <label>Repetições</label>
+          <input class="edit-reps" type="number" value="${s.repeticoes ?? ""}">
+
+          <label>Observações</label>
+          <textarea class="edit-obs">${s.observacoes ?? ""}</textarea>
+
+          <button type="button" class="remove-btn">Remover</button>
+        `;
+        row.querySelector(".remove-btn").onclick = () => row.remove();
+        list.appendChild(row);
       });
 
-      for (const idEx in grouped) {
-        const block = document.createElement("div");
-        block.className = "ex-edit";
-        block.dataset.idEx = idEx;
+      bloco.querySelector(".add-serie-btn").onclick = () => {
+        const row = document.createElement("div");
+        row.className = "series-row";
+        row.innerHTML = `
+          <label>Peso (kg)</label>
+          <input class="edit-carga" type="number">
 
-        block.innerHTML = `
-          <strong>${exMap[idEx] || "Ex " + idEx}</strong>
+          <label>Repetições</label>
+          <input class="edit-reps" type="number">
+
+          <label>Observações</label>
+          <textarea class="edit-obs"></textarea>
+
+          <button type="button" class="remove-btn">Remover</button>
+        `;
+        row.querySelector(".remove-btn").onclick = () => row.remove();
+        list.appendChild(row);
+      };
+
+      editContainer.appendChild(bloco);
+    }
+
+    // =========================
+    // ➕ ADICIONAR NOVO EXERCÍCIO
+    // =========================
+    const addExBtn = document.createElement("button");
+    addExBtn.type = "button";
+    addExBtn.className = "btn primary";
+    addExBtn.textContent = "+ Adicionar Exercício";
+
+    addExBtn.onclick = async () => {
+      const { data: exs } = await supabase
+        .from("exercicios")
+        .select("id_exercicio,nome_exercicio");
+
+      const select = document.createElement("select");
+      select.innerHTML = exs
+        .map(e => `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`)
+        .join("");
+
+      const confirmar = document.createElement("button");
+      confirmar.textContent = "Adicionar";
+      confirmar.type = "button";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "mini-modal";
+      wrapper.appendChild(select);
+      wrapper.appendChild(confirmar);
+
+      modal.appendChild(wrapper);
+
+      confirmar.onclick = () => {
+        const idEx = select.value;
+        const nome = exs.find(e => e.id_exercicio == idEx)?.nome_exercicio;
+
+        const bloco = document.createElement("div");
+        bloco.className = "ex-edit";
+        bloco.dataset.idEx = idEx;
+
+        bloco.innerHTML = `
+          <strong>${nome}</strong>
           <div class="series-edit-list"></div>
           <button type="button" class="add-serie-btn">+ Série</button>
         `;
 
-        const list = block.querySelector(".series-edit-list");
-
-        grouped[idEx].forEach(s => {
+        bloco.querySelector(".add-serie-btn").onclick = () => {
           const row = document.createElement("div");
           row.className = "series-row";
           row.innerHTML = `
-            <input type="number" class="edit-carga" value="${s.carga ?? ""}" placeholder="Carga">
-            <input type="number" class="edit-reps" value="${s.repeticoes ?? ""}" placeholder="Reps">
-            <input type="number" class="edit-series" value="${s.series ?? ""}" placeholder="Série #">
-            <textarea class="edit-obs">${s.observacoes ?? ""}</textarea>
-            <button type="button" class="remove-btn">Remover</button>
-          `;
-          row.querySelector(".remove-btn").onclick = () => row.remove();
-          list.appendChild(row);
-        });
+            <label>Peso (kg)</label>
+            <input class="edit-carga" type="number">
 
-        block.querySelector(".add-serie-btn").onclick = () => {
-          const row = document.createElement("div");
-          row.className = "series-row";
-          row.innerHTML = `
-            <input type="number" class="edit-carga" placeholder="Carga">
-            <input type="number" class="edit-reps" placeholder="Reps">
-            <input type="number" class="edit-series" placeholder="Série #">
+            <label>Repetições</label>
+            <input class="edit-reps" type="number">
+
+            <label>Observações</label>
             <textarea class="edit-obs"></textarea>
+
             <button type="button" class="remove-btn">Remover</button>
           `;
           row.querySelector(".remove-btn").onclick = () => row.remove();
-          list.appendChild(row);
+          bloco.querySelector(".series-edit-list").appendChild(row);
         };
 
-        editContainer.appendChild(block);
-      }
-
-      // =========================
-      // BOTÃO ADICIONAR NOVO EXERCÍCIO
-      // =========================
-      const addExButton = document.createElement("button");
-      addExButton.type = "button";
-      addExButton.className = "btn primary";
-      addExButton.textContent = "+ Adicionar Exercício";
-      editContainer.appendChild(addExButton);
-
-      addExButton.onclick = async () => {
-        try {
-          const { data: allExs, error: exErr } = await supabase
-            .from("exercicios")
-            .select("id_exercicio,nome_exercicio");
-          if (exErr) throw exErr;
-
-          const select = document.createElement("select");
-          select.innerHTML = allExs
-            .map(ex => `<option value="${ex.id_exercicio}">${ex.nome_exercicio}</option>`)
-            .join("");
-
-          const confirmBtn = document.createElement("button");
-          confirmBtn.textContent = "Adicionar";
-          confirmBtn.type = "button";
-
-          const modalAdd = document.createElement("div");
-          modalAdd.className = "mini-modal";
-          modalAdd.innerHTML = "<h3>Escolha o exercício</h3>";
-          modalAdd.appendChild(select);
-          modalAdd.appendChild(confirmBtn);
-
-          modal.appendChild(modalAdd);
-
-          confirmBtn.onclick = () => {
-            const chosenId = Number(select.value);
-            const chosenName = allExs.find(ex => ex.id_exercicio === chosenId)?.nome_exercicio;
-
-            const block = document.createElement("div");
-            block.className = "ex-edit";
-            block.dataset.idEx = chosenId;
-
-            block.innerHTML = `
-              <strong>${chosenName || "Novo Exercício"}</strong>
-              <div class="series-edit-list"></div>
-              <button type="button" class="add-serie-btn">+ Série</button>
-            `;
-
-            const list = block.querySelector(".series-edit-list");
-
-            const addSerie = () => {
-              const row = document.createElement("div");
-              row.className = "series-row";
-              row.innerHTML = `
-                <input type="number" class="edit-carga" placeholder="Carga">
-                <input type="number" class="edit-reps" placeholder="Reps">
-                <input type="number" class="edit-series" placeholder="Série #">
-                <textarea class="edit-obs"></textarea>
-                <button type="button" class="remove-btn">Remover</button>
-              `;
-              row.querySelector(".remove-btn").onclick = () => row.remove();
-              list.appendChild(row);
-            };
-
-            block.querySelector(".add-serie-btn").onclick = addSerie;
-            addSerie();
-
-            editContainer.appendChild(block);
-            modal.removeChild(modalAdd);
-          };
-        } catch (err) {
-          console.error("Erro ao adicionar exercício:", err);
-          alert("Erro ao carregar exercícios (veja console).");
-        }
+        editContainer.appendChild(bloco);
+        modal.removeChild(wrapper);
       };
+    };
 
-      modal.style.display = "flex";
+    editContainer.appendChild(addExBtn);
+    modal.style.display = "flex";
 
-    } catch (err) {
-      console.error(err);
-      alert("Erro ao abrir edição (veja console).");
+  } catch (err) {
+    console.error(err);
+    alert("Erro ao editar treino.");
+  }
+};
+
+
+  // =========================
+  // SALVAR
+  // =========================
+  formEditar.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const idTreino = document.getElementById("edit_id_treino").value;
+    const data = document.getElementById("edit_data_treino").value;
+    const obs = document.getElementById("edit_observacoes_gerais").value;
+
+    await supabase
+      .from("treinos")
+      .update({ data_treino: data, observacoes_gerais: obs })
+      .eq("id_treino", idTreino);
+
+    await supabase
+      .from("treino_exercicio")
+      .delete()
+      .eq("id_treino_fk", idTreino);
+
+    const blocos = editContainer.querySelectorAll(".ex-edit");
+
+    for (const bloco of blocos) {
+      const idEx = bloco.dataset.idEx;
+      const linhas = bloco.querySelectorAll(".series-row");
+
+      let ordem = 1;
+      for (const row of linhas) {
+        await supabase.from("treino_exercicio").insert({
+          id_treino_fk: idTreino,
+          id_exercicio_fk: idEx,
+          carga: row.querySelector(".edit-carga").value || null,
+          repeticoes: row.querySelector(".edit-reps").value || null,
+          series: ordem++,
+          observacoes: row.querySelector(".edit-obs").value || null
+        });
+      }
     }
-  };
+
+    modal.style.display = "none";
+    carregarTreinos();
+  });
 
   // =========================
   // EXCLUIR
   // =========================
   window.excluirTreino = async function (idTreino) {
-    if (!confirm("Excluir treino e todas as séries?")) return;
+    if (!confirm("Excluir treino?")) return;
     await supabase.from("treino_exercicio").delete().eq("id_treino_fk", idTreino);
     await supabase.from("treinos").delete().eq("id_treino", idTreino);
     carregarTreinos();
@@ -356,5 +389,4 @@ document.addEventListener("DOMContentLoaded", () => {
   // INIT
   // =========================
   carregarTreinos();
-
 });

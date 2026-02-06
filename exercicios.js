@@ -9,15 +9,22 @@ const form = document.getElementById("formExercicio");
 const fechar = document.getElementById("fecharModal");
 const btnNovo = document.getElementById("btnNovoExercicio");
 const tituloModal = document.getElementById("tituloModal");
+const inputPesquisa = document.getElementById("pesquisaExercicio");
 
 /* =========================
    CARREGAR EXERCÍCIOS
 ========================= */
-async function carregarExercicios() {
-  const { data, error } = await supabase
+async function carregarExercicios(filtroNome = "") {
+  let query = supabase
     .from("exercicios")
     .select("*")
-    .order("id_exercicio", { ascending: true });
+    .order("nome_exercicio", { ascending: true }); // 🔤 ordem alfabética
+
+  if (filtroNome) {
+    query = query.ilike("nome_exercicio", `%${filtroNome}%`); // 🔎 pesquisa
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Erro ao carregar exercícios:", error);
@@ -43,6 +50,16 @@ async function carregarExercicios() {
     `;
 
     lista.appendChild(card);
+  });
+}
+
+/* =========================
+   PESQUISA POR NOME
+========================= */
+if (inputPesquisa) {
+  inputPesquisa.addEventListener("input", (e) => {
+    const valor = e.target.value.trim();
+    carregarExercicios(valor);
   });
 }
 
@@ -98,7 +115,7 @@ form.onsubmit = async (e) => {
 };
 
 /* =========================
-   EDITAR (EXPOSTO NO WINDOW)
+   EDITAR
 ========================= */
 window.editarExercicio = async function (id) {
   const { data, error } = await supabase
@@ -123,7 +140,7 @@ window.editarExercicio = async function (id) {
 };
 
 /* =========================
-   EXCLUIR (EXPOSTO NO WINDOW)
+   EXCLUIR
 ========================= */
 window.excluirExercicio = async function (id) {
   if (!confirm("Deseja realmente excluir este exercício?")) return;
