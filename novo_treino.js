@@ -1,11 +1,11 @@
-// novo_treino.js — simples, robusto e com o esquema correto
+// novo_treino.js
 import { supabase } from "./supabase.js";
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  // =========================
-  // ELEMENTOS / PARAMS
-  // =========================
+  /* =========================
+     PARAMS / ELEMENTOS
+  ========================= */
   const params = new URLSearchParams(window.location.search);
   const alunoId = params.get("id");
 
@@ -17,210 +17,193 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSalvar = document.getElementById("btnSalvar");
   const btnCancelar = document.getElementById("btnCancelar");
   const statusEl = document.getElementById("status");
-console.log({
-  alunoIdDisplay,
-  dataTreinoInput,
-  observacoesGeraisEl,
-  exerciciosWrapper,
-  btnAddEx,
-  btnSalvar,
-  btnCancelar,
-  statusEl
-});
 
-  // defesa básica
-  if (
-    !alunoIdDisplay ||
-    !dataTreinoInput ||
-    !observacoesGeraisEl ||
-    !exerciciosWrapper ||
-    !btnAddEx ||
-    !btnSalvar ||
-    !btnCancelar ||
-    !statusEl
-  ) {
-    console.error("Elementos do DOM não encontrados");
+  if (!alunoId) {
+    statusEl.textContent = "Aluno não informado na URL (?id=...)";
+    btnSalvar.disabled = true;
+    btnAddEx.disabled = true;
     return;
   }
 
-  alunoIdDisplay.textContent = alunoId || "—";
+  alunoIdDisplay.textContent = alunoId;
 
-  if (!alunoId) {
-    statusEl.textContent = "Aluno não informado na URL (?id=...).";
-    btnAddEx.disabled = true;
-    btnSalvar.disabled = true;
-  }
+  /* =========================
+     DATA PADRÃO
+  ========================= */
+  const hoje = new Date();
+  dataTreinoInput.value = hoje.toISOString().split("T")[0];
 
-  // =========================
-  // DATA PADRÃO (HOJE)
-  // =========================
-  function setToday() {
-    const d = new Date();
-    const pad = n => String(n).padStart(2, "0");
-    dataTreinoInput.value =
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
-
-  setToday();
-
-  // =========================
-  // CATÁLOGO DE EXERCÍCIOS
-  // =========================
+  /* =========================
+     CATÁLOGO DE EXERCÍCIOS
+  ========================= */
   let catalog = [];
 
   async function loadCatalog() {
-    statusEl.textContent = "Carregando catálogo de exercícios...";
-
     const { data, error } = await supabase
       .from("exercicios")
       .select("id_exercicio, nome_exercicio")
-      .order("nome_exercicio", { ascending: true });
+      .order("nome_exercicio");
 
     if (error) {
-      console.error("Erro ao buscar exercícios:", error);
-      statusEl.textContent = "Erro ao carregar exercícios (veja console).";
+      console.error(error);
+      alert("Erro ao carregar exercícios");
       return;
     }
 
     catalog = data || [];
-    statusEl.textContent = "";
-
-    if (catalog.length === 0) {
-      statusEl.textContent =
-        "Nenhum exercício cadastrado. Vá em Exercícios e crie alguns.";
-    }
   }
 
-  // =========================
-  // BLOCO DE EXERCÍCIO
-  // =========================
+  /* =========================
+     CRIAR EXERCÍCIO NO BANCO
+  ========================= */
+  async function criarNovoExercicio(nome) {
+    const { data, error } = await supabase
+      .from("exercicios")
+      .insert([{ nome_exercicio: nome }])
+      .select("id_exercicio, nome_exercicio")
+      .single();
+
+    if (error) throw error;
+
+    catalog.push(data);
+    return data;
+  }
+
+  /* =========================
+     ATUALIZAR TODOS OS SELECTS
+  ========================= */
+  function atualizarSelects(novo) {
+    document.querySelectorAll(".ex-block select").forEach(select => {
+      const opt = document.createElement("option");
+      opt.value = novo.id_exercicio;
+      opt.textContent = novo.nome_exercicio;
+
+      select.insertBefore(opt, select.lastElementChild);
+    });
+  }
+
+  /* =========================
+     BLOCO DE EXERCÍCIO
+  ========================= */
   function createExerciseBlock() {
     const exBlock = document.createElement("div");
     exBlock.className = "ex-block";
 
-    const header = document.createElement("div");
-    header.className = "ex-header";
+const header = document.createElement("div");
+header.className = "ex-header";
 
-    const select = document.createElement("select");
-    select.innerHTML =
-      `<option value="">-- selecione um exercício --</option>`;
+const select = document.createElement("select");
+select.innerHTML = `
+  <option value="">-- selecione um exercício --</option>
+  ${catalog.map(e =>
+    `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`
+  ).join("")}
+`;
 
-    catalog.forEach(e => {
-      const opt = document.createElement("option");
-      opt.value = e.id_exercicio;
-      opt.textContent = e.nome_exercicio;
-      select.appendChild(opt);
-    });
+const btnNovo = document.createElement("button");
+btnNovo.type = "button";
+btnNovo.textContent = "+ Criar exercício";
+btnNovo.onclick = async () => {
+  const nome = prompt("Nome do novo exercício:");
+  if (!nome || !nome.trim()) return;
 
-    const removeExBtn = document.createElement("button");
-    removeExBtn.type = "button";
-    removeExBtn.className = "ex-remove btn-small";
-    removeExBtn.textContent = "Remover exercício";
-    removeExBtn.onclick = () => exBlock.remove();
+  try {
+    const novo = await criarNovoExercicio(nome.trim());
+    atualizarSelects(novo);
+    select.value = novo.id_exercicio;
+  } catch {
+    alert("Erro ao criar exercício");
+  }
+};
 
-    header.appendChild(select);
-    header.appendChild(removeExBtn);
-    exBlock.appendChild(header);
+header.append(select, btnNovo);
+exBlock.appendChild(header);
 
     const seriesList = document.createElement("div");
     seriesList.className = "series-list";
 
-    function addSeriesRow(cargaVal = "", repsVal = "", obsVal = "") {
+    function addSerie() {
       const row = document.createElement("div");
       row.className = "series-row";
 
       const carga = document.createElement("input");
       carga.type = "number";
       carga.placeholder = "Carga (kg)";
-      carga.value = cargaVal;
 
       const reps = document.createElement("input");
       reps.type = "number";
       reps.placeholder = "Repetições";
-      reps.value = repsVal;
 
       const obs = document.createElement("textarea");
       obs.placeholder = "Observações (opcional)";
       obs.rows = 1;
-      obs.value = obsVal;
 
-      const btnRem = document.createElement("button");
-      btnRem.type = "button";
-      btnRem.className = "remove btn-small";
-      btnRem.textContent = "Remover série";
-      btnRem.onclick = () => row.remove();
+      const remover = document.createElement("button");
+      remover.type = "button";
+      remover.textContent = "Remover série";
+      remover.onclick = () => row.remove();
 
-      row.append(carga, reps, obs, btnRem);
+      row.append(carga, reps, obs, remover);
       seriesList.appendChild(row);
     }
 
-    addSeriesRow();
+    addSerie();
 
-    const addSeriesBtn = document.createElement("button");
-    addSeriesBtn.type = "button";
-    addSeriesBtn.className = "add-series btn-small";
-    addSeriesBtn.textContent = "+ Série";
-    addSeriesBtn.onclick = () => addSeriesRow();
+    const btnAddSerie = document.createElement("button");
+    btnAddSerie.type = "button";
+    btnAddSerie.textContent = "+ Série";
+    btnAddSerie.onclick = addSerie;
 
-    exBlock.append(seriesList, addSeriesBtn);
+    const btnRemoveEx = document.createElement("button");
+    btnRemoveEx.type = "button";
+    btnRemoveEx.textContent = "Remover exercício";
+    btnRemoveEx.onclick = () => exBlock.remove();
+
+    exBlock.append(select, seriesList, btnAddSerie, btnRemoveEx);
     exerciciosWrapper.appendChild(exBlock);
-
-    return exBlock;
   }
 
-  // =========================
-  // EVENTOS
-  // =========================
-  btnAddEx.addEventListener("click", () => {
-    if (catalog.length === 0) {
-      alert("Nenhum exercício cadastrado. Crie exercícios primeiro.");
-      return;
-    }
-    createExerciseBlock();
-  });
+  /* =========================
+     EVENTOS
+  ========================= */
+  btnAddEx.onclick = createExerciseBlock;
 
-  btnCancelar.addEventListener("click", () => {
-    if (alunoId) {
-      window.location.href = `aluno_detalhe.html?id=${alunoId}`;
-    } else {
-      history.back();
-    }
-  });
+  btnCancelar.onclick = () => {
+    window.location.href = `aluno_detalhe.html?id=${alunoId}`;
+  };
 
-  btnSalvar.addEventListener("click", async () => {
+  btnSalvar.onclick = async () => {
     try {
-      statusEl.textContent = "Salvando treino...";
       btnSalvar.disabled = true;
+      statusEl.textContent = "Salvando treino...";
 
-      if (!alunoId) throw new Error("ID do aluno não informado na URL.");
-
-      const data_treino = dataTreinoInput.value;
-      const observacoes_gerais = observacoesGeraisEl.value || null;
-
-      const { data: treinoData, error: errT } = await supabase
+      const { data: treino, error } = await supabase
         .from("treinos")
-        .insert([{ id_aluno_fk: Number(alunoId), data_treino, observacoes_gerais }])
-        .select()
+        .insert([{
+          id_aluno_fk: Number(alunoId),
+          data_treino: dataTreinoInput.value,
+          observacoes_gerais: observacoesGeraisEl.value || null
+        }])
+        .select("id_treino")
         .single();
 
-      if (errT) throw errT;
+      if (error) throw error;
 
-      const id_treino = treinoData.id_treino;
       const inserts = [];
 
       document.querySelectorAll(".ex-block").forEach(block => {
         const select = block.querySelector("select");
         const id_exercicio_fk = Number(select.value);
-        if (!id_exercicio_fk) return;
+        if (!id_exercicio_fk || isNaN(id_exercicio_fk)) return;
 
         block.querySelectorAll(".series-row").forEach((row, i) => {
-          const inputs = row.querySelectorAll("input[type='number']");
-          const carga = inputs[0].value ? Number(inputs[0].value) : null;
-          const repeticoes = inputs[1].value ? Number(inputs[1].value) : null;
+          const nums = row.querySelectorAll("input[type='number']");
+          const carga = nums[0].value ? Number(nums[0].value) : null;
+          const repeticoes = nums[1].value ? Number(nums[1].value) : null;
           const obs = row.querySelector("textarea").value || null;
 
           inserts.push({
-            id_treino_fk: id_treino,
+            id_treino_fk: treino.id_treino,
             id_exercicio_fk,
             carga,
             repeticoes,
@@ -231,40 +214,32 @@ console.log({
         });
       });
 
-      if (inserts.length === 0) {
-        await supabase.from("treinos").delete().eq("id_treino", id_treino);
-        throw new Error("Adicione pelo menos uma série antes de salvar.");
+      if (!inserts.length) {
+        alert("Adicione ao menos uma série.");
+        btnSalvar.disabled = false;
+        statusEl.textContent = "";
+        return;
       }
 
-      const { error: errInsert } =
-        await supabase.from("treino_exercicio").insert(inserts);
+      await supabase.from("treino_exercicio").insert(inserts);
 
-      if (errInsert) {
-        await supabase.from("treinos").delete().eq("id_treino", id_treino);
-        throw errInsert;
-      }
-
-      statusEl.textContent = "Treino salvo com sucesso!";
-      setTimeout(() => {
-        window.location.href = `treinos_anteriores.html?id=${alunoId}`;
-      }, 700);
+      alert("Treino salvo com sucesso!");
+      window.location.href = `treinos_anteriores.html?id=${alunoId}`;
 
     } catch (err) {
       console.error(err);
-      alert(err.message || "Erro ao salvar treino.");
-      statusEl.textContent = "";
+      alert("Erro ao salvar treino");
       btnSalvar.disabled = false;
+      statusEl.textContent = "";
     }
-  });
+  };
 
-  // =========================
-  // INIT
-  // =========================
+  /* =========================
+     INIT
+  ========================= */
   (async function init() {
     await loadCatalog();
-    if (catalog.length) {
-      createExerciseBlock();
-    }
+    createExerciseBlock();
   })();
 
 });
