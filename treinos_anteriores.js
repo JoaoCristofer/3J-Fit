@@ -30,11 +30,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const listaTreinos = document.getElementById("listaTreinos");
   const statusEl = document.getElementById("status");
   const voltar = document.getElementById("voltar");
+  let draggedEx = null;
 
   const modal = document.getElementById("modalEditar");
   const fecharModal = document.getElementById("fecharModal");
   const formEditar = document.getElementById("formEditar");
   const editContainer = document.getElementById("edit_exercicios_container");
+
+  // =========================
+  // DRAG OVER NO CONTAINER
+  // =========================
+editContainer.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  if (!draggedEx) return;
+
+  const after = getDragAfterElement(editContainer, e.clientY);
+
+  if (after == null) {
+    editContainer.insertBefore(draggedEx, editContainer.querySelector(".btn"));
+  } else {
+    editContainer.insertBefore(draggedEx, after);
+  }
+});
 
   // =========================
   // VOLTAR
@@ -69,10 +86,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const treinoIds = treinos.map(t => t.id_treino);
 
       const { data: seriesAll } = await supabase
-        .from("treino_exercicio")
-        .select("*")
-        .in("id_treino_fk", treinoIds)
-        .order("id_treino_exercicio", { ascending: true });
+.from("treino_exercicio")
+.select("*")
+.in("id_treino_fk", treinoIds)
+.order("ordem_exercicio", { ascending: true })
+.order("series", { ascending: true });
+
 
       const exercIds = [...new Set(seriesAll.map(s => s.id_exercicio_fk))];
 
@@ -153,148 +172,122 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function enableExerciseDrag(bloco) {
+    bloco.draggable = true;
+
+    bloco.addEventListener("dragstart", () => {
+      draggedEx = bloco;
+      bloco.classList.add("dragging");
+    });
+
+    bloco.addEventListener("dragend", () => {
+      draggedEx = null;
+      bloco.classList.remove("dragging");
+    });
+
+
+  }
+
+  function getDragAfterElement(container, y) {
+    const els = [...container.querySelectorAll(".ex-edit:not(.dragging)")];
+
+    return els.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
   // =========================
   // ABRIR EDITAR
   // =========================
-window.abrirEditar = async function (idTreino) {
-  try {
-    const { data: treino } = await supabase
-      .from("treinos")
-      .select("*")
-      .eq("id_treino", idTreino)
-      .single();
+  window.abrirEditar = async function (idTreino) {
+    try {
+      const { data: treino } = await supabase
+        .from("treinos")
+        .select("*")
+        .eq("id_treino", idTreino)
+        .single();
 
-    document.getElementById("edit_id_treino").value = treino.id_treino;
-    document.getElementById("edit_data_treino").value = treino.data_treino;
-    document.getElementById("edit_observacoes_gerais").value =
-      treino.observacoes_gerais || "";
+      document.getElementById("edit_id_treino").value = treino.id_treino;
+      document.getElementById("edit_data_treino").value = treino.data_treino;
+      document.getElementById("edit_observacoes_gerais").value =
+        treino.observacoes_gerais || "";
 
-    editContainer.innerHTML = "";
+      editContainer.innerHTML = "";
 
-    const { data: series } = await supabase
-      .from("treino_exercicio")
-      .select("*")
-      .eq("id_treino_fk", idTreino)
-      .order("id_treino_exercicio", { ascending: true });
 
-    // 🔥 buscar nomes dos exercícios
-    const exIds = [...new Set(series.map(s => s.id_exercicio_fk))];
+      const { data: series } = await supabase
+  .from("treino_exercicio")
+  .select("*")
+  .eq("id_treino_fk", idTreino)
+  .order("ordem_exercicio", { ascending: true })
+  .order("series", { ascending: true });
 
-    let exMap = {};
-    if (exIds.length) {
-      const { data: exs } = await supabase
-        .from("exercicios")
-        .select("id_exercicio,nome_exercicio")
-        .in("id_exercicio", exIds);
 
-      exs.forEach(e => (exMap[e.id_exercicio] = e.nome_exercicio));
-    }
+      const exIds = [...new Set(series.map(s => s.id_exercicio_fk))];
 
-    const grouped = {};
-    series.forEach(s => {
-      if (!grouped[s.id_exercicio_fk]) grouped[s.id_exercicio_fk] = [];
-      grouped[s.id_exercicio_fk].push(s);
-    });
+      let exMap = {};
+      if (exIds.length) {
+        const { data: exs } = await supabase
+          .from("exercicios")
+          .select("id_exercicio,nome_exercicio")
+          .in("id_exercicio", exIds);
 
-    // =========================
-    // EXERCÍCIOS EXISTENTES
-    // =========================
-    for (const idEx in grouped) {
-      const bloco = document.createElement("div");
-      bloco.className = "ex-edit";
-      bloco.dataset.idEx = idEx;
+        exs.forEach(e => (exMap[e.id_exercicio] = e.nome_exercicio));
+      }
 
-      bloco.innerHTML = `
-        <strong>${exMap[idEx] || "Exercício #" + idEx}</strong>
-        <div class="series-edit-list"></div>
-        <button type="button" class="add-serie-btn">+ Série</button>
-      `;
+const groupedMap = new Map();
 
-      const list = bloco.querySelector(".series-edit-list");
+series.forEach(s => {
+  if (!groupedMap.has(s.id_exercicio_fk)) {
+    groupedMap.set(s.id_exercicio_fk, []);
+  }
+  groupedMap.get(s.id_exercicio_fk).push(s);
+});
 
-      grouped[idEx].forEach(s => {
-        const row = document.createElement("div");
-        row.className = "series-row";
-        row.innerHTML = `
-          <label>Peso (kg)</label>
-          <input class="edit-carga" type="number" value="${s.carga ?? ""}">
 
-          <label>Repetições</label>
-          <input class="edit-reps" type="number" value="${s.repeticoes ?? ""}">
-
-          <label>Observações</label>
-          <textarea class="edit-obs">${s.observacoes ?? ""}</textarea>
-
-          <button type="button" class="remove-btn">Remover</button>
-        `;
-        row.querySelector(".remove-btn").onclick = () => row.remove();
-        list.appendChild(row);
-      });
-
-      bloco.querySelector(".add-serie-btn").onclick = () => {
-        const row = document.createElement("div");
-        row.className = "series-row";
-        row.innerHTML = `
-          <label>Peso (kg)</label>
-          <input class="edit-carga" type="number">
-
-          <label>Repetições</label>
-          <input class="edit-reps" type="number">
-
-          <label>Observações</label>
-          <textarea class="edit-obs"></textarea>
-
-          <button type="button" class="remove-btn">Remover</button>
-        `;
-        row.querySelector(".remove-btn").onclick = () => row.remove();
-        list.appendChild(row);
-      };
-
-      editContainer.appendChild(bloco);
-    }
-
-    // =========================
-    // ➕ ADICIONAR NOVO EXERCÍCIO
-    // =========================
-    const addExBtn = document.createElement("button");
-    addExBtn.type = "button";
-    addExBtn.className = "btn primary";
-    addExBtn.textContent = "+ Adicionar Exercício";
-
-    addExBtn.onclick = async () => {
-      const { data: exs } = await supabase
-        .from("exercicios")
-        .select("id_exercicio,nome_exercicio");
-
-      const select = document.createElement("select");
-      select.innerHTML = exs
-        .map(e => `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`)
-        .join("");
-
-      const confirmar = document.createElement("button");
-      confirmar.textContent = "Adicionar";
-      confirmar.type = "button";
-
-      const wrapper = document.createElement("div");
-      wrapper.className = "mini-modal";
-      wrapper.appendChild(select);
-      wrapper.appendChild(confirmar);
-
-      modal.appendChild(wrapper);
-
-      confirmar.onclick = () => {
-        const idEx = select.value;
-        const nome = exs.find(e => e.id_exercicio == idEx)?.nome_exercicio;
+   for (const [idEx, seriesDoEx] of groupedMap.entries()) {
 
         const bloco = document.createElement("div");
         bloco.className = "ex-edit";
         bloco.dataset.idEx = idEx;
 
-        bloco.innerHTML = `
-          <strong>${nome}</strong>
-          <div class="series-edit-list"></div>
-          <button type="button" class="add-serie-btn">+ Série</button>
-        `;
+bloco.innerHTML = `
+  <div class="ex-edit-header">
+    <strong>${exMap[idEx] || "Exercício #" + idEx}</strong>
+    <button type="button" class="remove-ex-btn">Remover exercício</button>
+  </div>
+  <div class="series-edit-list"></div>
+  <button type="button" class="add-serie-btn">+ Série</button>
+`;
+bloco.querySelector(".remove-ex-btn").onclick = () => {
+  if (confirm("Remover este exercício do treino?")) {
+    bloco.remove();
+  }
+};
+
+
+        const list = bloco.querySelector(".series-edit-list");
+
+        seriesDoEx.forEach(s => {
+          const row = document.createElement("div");
+          row.className = "series-row";
+          row.innerHTML = `
+            <label>Peso (kg)</label>
+            <input class="edit-carga" type="number" value="${s.carga ?? ""}">
+            <label>Repetições</label>
+            <input class="edit-reps" type="number" value="${s.repeticoes ?? ""}">
+            <label>Observações</label>
+            <textarea class="edit-obs">${s.observacoes ?? ""}</textarea>
+            <button type="button" class="remove-btn">Remover</button>
+          `;
+          row.querySelector(".remove-btn").onclick = () => row.remove();
+          list.appendChild(row);
+        });
 
         bloco.querySelector(".add-serie-btn").onclick = () => {
           const row = document.createElement("div");
@@ -302,33 +295,90 @@ window.abrirEditar = async function (idTreino) {
           row.innerHTML = `
             <label>Peso (kg)</label>
             <input class="edit-carga" type="number">
-
             <label>Repetições</label>
             <input class="edit-reps" type="number">
-
             <label>Observações</label>
             <textarea class="edit-obs"></textarea>
-
             <button type="button" class="remove-btn">Remover</button>
           `;
           row.querySelector(".remove-btn").onclick = () => row.remove();
-          bloco.querySelector(".series-edit-list").appendChild(row);
+          list.appendChild(row);
         };
 
+        enableExerciseDrag(bloco);
         editContainer.appendChild(bloco);
-        modal.removeChild(wrapper);
+      }
+
+      const addExBtn = document.createElement("button");
+      addExBtn.type = "button";
+      addExBtn.className = "btn primary";
+      addExBtn.textContent = "+ Adicionar Exercício";
+
+      addExBtn.onclick = async () => {
+        const { data: exs } = await supabase
+          .from("exercicios")
+          .select("id_exercicio,nome_exercicio");
+
+        const select = document.createElement("select");
+        select.innerHTML = exs
+          .map(e => `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`)
+          .join("");
+
+        const confirmar = document.createElement("button");
+        confirmar.textContent = "Adicionar";
+        confirmar.type = "button";
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "mini-modal";
+        wrapper.appendChild(select);
+        wrapper.appendChild(confirmar);
+
+        modal.appendChild(wrapper);
+
+        confirmar.onclick = () => {
+          const idEx = select.value;
+          const nome = exs.find(e => e.id_exercicio == idEx)?.nome_exercicio;
+
+          const bloco = document.createElement("div");
+          bloco.className = "ex-edit";
+          bloco.dataset.idEx = idEx;
+
+          bloco.innerHTML = `
+            <strong>${nome}</strong>
+            <div class="series-edit-list"></div>
+            <button type="button" class="add-serie-btn">+ Série</button>
+          `;
+
+          bloco.querySelector(".add-serie-btn").onclick = () => {
+            const row = document.createElement("div");
+            row.className = "series-row";
+            row.innerHTML = `
+              <label>Peso (kg)</label>
+              <input class="edit-carga" type="number">
+              <label>Repetições</label>
+              <input class="edit-reps" type="number">
+              <label>Observações</label>
+              <textarea class="edit-obs"></textarea>
+              <button type="button" class="remove-btn">Remover</button>
+            `;
+            row.querySelector(".remove-btn").onclick = () => row.remove();
+            bloco.querySelector(".series-edit-list").appendChild(row);
+          };
+
+          enableExerciseDrag(bloco); // 🔽 ADIÇÃO
+          editContainer.appendChild(bloco);
+          modal.removeChild(wrapper);
+        };
       };
-    };
 
-    editContainer.appendChild(addExBtn);
-    modal.style.display = "flex";
+      editContainer.appendChild(addExBtn);
+      modal.style.display = "flex";
 
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao editar treino.");
-  }
-};
-
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao editar treino.");
+    }
+  };
 
   // =========================
   // SALVAR
@@ -352,22 +402,28 @@ window.abrirEditar = async function (idTreino) {
 
     const blocos = editContainer.querySelectorAll(".ex-edit");
 
-    for (const bloco of blocos) {
-      const idEx = bloco.dataset.idEx;
-      const linhas = bloco.querySelectorAll(".series-row");
+let ordemExercicio = 1;
 
-      let ordem = 1;
-      for (const row of linhas) {
-        await supabase.from("treino_exercicio").insert({
-          id_treino_fk: idTreino,
-          id_exercicio_fk: idEx,
-          carga: row.querySelector(".edit-carga").value || null,
-          repeticoes: row.querySelector(".edit-reps").value || null,
-          series: ordem++,
-          observacoes: row.querySelector(".edit-obs").value || null
-        });
-      }
-    }
+for (const bloco of blocos) {
+  const idEx = bloco.dataset.idEx;
+  const linhas = bloco.querySelectorAll(".series-row");
+
+  let serie = 1;
+  for (const row of linhas) {
+    await supabase.from("treino_exercicio").insert({
+      id_treino_fk: idTreino,
+      id_exercicio_fk: idEx,
+      ordem_exercicio: ordemExercicio, // 🔑 ESSENCIAL
+      carga: row.querySelector(".edit-carga").value || null,
+      repeticoes: row.querySelector(".edit-reps").value || null,
+      series: serie++,
+      observacoes: row.querySelector(".edit-obs").value || null
+    });
+  }
+
+  ordemExercicio++;
+}
+
 
     modal.style.display = "none";
     carregarTreinos();
