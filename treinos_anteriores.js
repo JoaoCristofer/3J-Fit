@@ -23,6 +23,20 @@ document.addEventListener("DOMContentLoaded", () => {
   if (alunoIdUrl && !isNaN(alunoIdUrl)) {
     setAlunoAtual(Number(alunoIdUrl));
   }
+async function loadCatalogExercicios() {
+  const { data, error } = await supabase
+    .from("exercicios")
+    .select("id_exercicio, nome_exercicio");
+
+  if (error) {
+    alert("Erro ao carregar exercícios");
+    return;
+  }
+
+  catalogExercicios = (data || []).sort((a, b) =>
+    a.nome_exercicio.localeCompare(b.nome_exercicio, "pt-BR")
+  );
+}
 
   // =========================
   // ELEMENTOS DOM
@@ -31,6 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusEl = document.getElementById("status");
   const voltar = document.getElementById("voltar");
   let draggedEx = null;
+let catalogExercicios = [];
 
   const modal = document.getElementById("modalEditar");
   const fecharModal = document.getElementById("fecharModal");
@@ -314,62 +329,86 @@ bloco.querySelector(".remove-ex-btn").onclick = () => {
       addExBtn.className = "btn primary";
       addExBtn.textContent = "+ Adicionar Exercício";
 
-      addExBtn.onclick = async () => {
-        const { data: exs } = await supabase
-          .from("exercicios")
-          .select("id_exercicio,nome_exercicio");
+addExBtn.onclick = async () => {
 
-        const select = document.createElement("select");
-        select.innerHTML = exs
-          .map(e => `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`)
-          .join("");
+  if (!catalogExercicios.length) {
+    await loadCatalogExercicios();
+  }
 
-        const confirmar = document.createElement("button");
-        confirmar.textContent = "Adicionar";
-        confirmar.type = "button";
+  const wrapper = document.createElement("div");
+  wrapper.className = "mini-modal";
 
-        const wrapper = document.createElement("div");
-        wrapper.className = "mini-modal";
-        wrapper.appendChild(select);
-        wrapper.appendChild(confirmar);
+  // 🔍 CAMPO DE PESQUISA
+  const search = document.createElement("input");
+  search.type = "search";
+  search.placeholder = "Pesquisar exercício...";
+  search.style.marginBottom = "8px";
 
-        modal.appendChild(wrapper);
+  const select = document.createElement("select");
 
-        confirmar.onclick = () => {
-          const idEx = select.value;
-          const nome = exs.find(e => e.id_exercicio == idEx)?.nome_exercicio;
+  function render(filtro = "") {
+    select.innerHTML = catalogExercicios
+      .filter(e =>
+        e.nome_exercicio.toLowerCase().includes(filtro.toLowerCase())
+      )
+      .map(e =>
+        `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`
+      )
+      .join("");
+  }
 
-          const bloco = document.createElement("div");
-          bloco.className = "ex-edit";
-          bloco.dataset.idEx = idEx;
+  // 🔤 ORDEM ALFABÉTICA GARANTIDA
+  render();
 
-          bloco.innerHTML = `
-            <strong>${nome}</strong>
-            <div class="series-edit-list"></div>
-            <button type="button" class="add-serie-btn">+ Série</button>
-          `;
+  search.addEventListener("input", () => {
+    render(search.value);
+  });
 
-          bloco.querySelector(".add-serie-btn").onclick = () => {
-            const row = document.createElement("div");
-            row.className = "series-row";
-            row.innerHTML = `
-              <label>Peso (kg)</label>
-              <input class="edit-carga" type="number">
-              <label>Repetições</label>
-              <input class="edit-reps" type="number">
-              <label>Observações</label>
-              <textarea class="edit-obs"></textarea>
-              <button type="button" class="remove-btn">Remover</button>
-            `;
-            row.querySelector(".remove-btn").onclick = () => row.remove();
-            bloco.querySelector(".series-edit-list").appendChild(row);
-          };
+  const confirmar = document.createElement("button");
+  confirmar.textContent = "Adicionar";
+  confirmar.type = "button";
 
-          enableExerciseDrag(bloco); // 🔽 ADIÇÃO
-          editContainer.appendChild(bloco);
-          modal.removeChild(wrapper);
-        };
-      };
+  confirmar.onclick = () => {
+    const idEx = select.value;
+    const nome = catalogExercicios.find(
+      e => e.id_exercicio == idEx
+    )?.nome_exercicio;
+
+    const bloco = document.createElement("div");
+    bloco.className = "ex-edit";
+    bloco.dataset.idEx = idEx;
+
+    bloco.innerHTML = `
+      <strong>${nome}</strong>
+      <div class="series-edit-list"></div>
+      <button type="button" class="add-serie-btn">+ Série</button>
+    `;
+
+    bloco.querySelector(".add-serie-btn").onclick = () => {
+      const row = document.createElement("div");
+      row.className = "series-row";
+      row.innerHTML = `
+        <label>Peso (kg)</label>
+        <input class="edit-carga" type="number">
+        <label>Repetições</label>
+        <input class="edit-reps" type="number">
+        <label>Observações</label>
+        <textarea class="edit-obs"></textarea>
+        <button type="button" class="remove-btn">Remover</button>
+      `;
+      row.querySelector(".remove-btn").onclick = () => row.remove();
+      bloco.querySelector(".series-edit-list").appendChild(row);
+    };
+
+    enableExerciseDrag(bloco);
+    editContainer.appendChild(bloco);
+    modal.removeChild(wrapper);
+  };
+
+  wrapper.append(search, select, confirmar);
+  modal.appendChild(wrapper);
+};
+
 
       editContainer.appendChild(addExBtn);
       modal.style.display = "flex";
@@ -427,6 +466,8 @@ for (const bloco of blocos) {
 
     modal.style.display = "none";
     carregarTreinos();
+    loadCatalogExercicios();
+
   });
 
   // =========================
@@ -437,6 +478,8 @@ for (const bloco of blocos) {
     await supabase.from("treino_exercicio").delete().eq("id_treino_fk", idTreino);
     await supabase.from("treinos").delete().eq("id_treino", idTreino);
     carregarTreinos();
+    loadCatalogExercicios();
+
   };
 
   fecharModal.onclick = () => modal.style.display = "none";
@@ -445,4 +488,6 @@ for (const bloco of blocos) {
   // INIT
   // =========================
   carregarTreinos();
+  loadCatalogExercicios();
+
 });

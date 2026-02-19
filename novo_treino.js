@@ -36,7 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Erro ao carregar exercícios");
       return;
     }
-    catalog = data || [];
+
+    catalog = (data || []).sort((a, b) =>
+      a.nome_exercicio.localeCompare(b.nome_exercicio, "pt-BR")
+    );
   }
 
   async function criarNovoExercicio(nome) {
@@ -47,16 +50,33 @@ document.addEventListener("DOMContentLoaded", () => {
       .single();
 
     if (error) throw error;
+
     catalog.push(data);
+    catalog.sort((a, b) =>
+      a.nome_exercicio.localeCompare(b.nome_exercicio, "pt-BR")
+    );
+
     return data;
   }
 
-  function atualizarSelects(novo) {
-    document.querySelectorAll(".ex-block select").forEach(select => {
-      const opt = document.createElement("option");
-      opt.value = novo.id_exercicio;
-      opt.textContent = novo.nome_exercicio;
-      select.appendChild(opt);
+  function atualizarSelects() {
+    document.querySelectorAll(".ex-block").forEach(block => {
+      const select = block.querySelector("select");
+      const search = block.querySelector("input[type='search']");
+      if (!select) return;
+
+      const filtro = search?.value?.toLowerCase() || "";
+
+      select.innerHTML = `
+        <option value="">-- selecione um exercício --</option>
+        ${catalog
+          .filter(e =>
+            e.nome_exercicio.toLowerCase().includes(filtro)
+          )
+          .map(e =>
+            `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`
+          ).join("")}
+      `;
     });
   }
 
@@ -111,23 +131,39 @@ document.addEventListener("DOMContentLoaded", () => {
     const header = document.createElement("div");
     header.className = "ex-header";
 
+    /* 🔍 PESQUISA */
+    const searchInput = document.createElement("input");
+    searchInput.type = "search";
+    searchInput.placeholder = "Pesquisar exercício...";
+
+    /* 🔽 SELECT */
     const select = document.createElement("select");
-    select.innerHTML = `
-      <option value="">-- selecione um exercício --</option>
-      ${catalog.map(e =>
-        `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`
-      ).join("")}
-    `;
+
+    function renderOptions(filter = "") {
+      const f = filter.toLowerCase();
+      select.innerHTML = `
+        <option value="">-- selecione um exercício --</option>
+        ${catalog
+          .filter(e => e.nome_exercicio.toLowerCase().includes(f))
+          .map(e =>
+            `<option value="${e.id_exercicio}">${e.nome_exercicio}</option>`
+          ).join("")}
+      `;
+    }
+
+    renderOptions();
+
+    searchInput.addEventListener("input", () => {
+      renderOptions(searchInput.value);
+    });
 
     select.addEventListener("change", () => {
       const val = Number(select.value);
-      if (val) {
-        exBlock.dataset.idEx = val;
-      } else {
-        delete exBlock.dataset.idEx;
-      }
+      if (val) exBlock.dataset.idEx = val;
+      else delete exBlock.dataset.idEx;
     });
 
+    /* ➕ NOVO EXERCÍCIO */
     const btnNovo = document.createElement("button");
     btnNovo.type = "button";
     btnNovo.textContent = "+ Criar exercício";
@@ -136,16 +172,20 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!nome) return;
 
       const novo = await criarNovoExercicio(nome.trim());
-      atualizarSelects(novo);
+      atualizarSelects();
+
+      searchInput.value = "";
+      renderOptions();
 
       select.value = novo.id_exercicio;
       exBlock.dataset.idEx = novo.id_exercicio;
       select.dispatchEvent(new Event("change"));
     };
 
-    header.append(select, btnNovo);
+    header.append(searchInput, select, btnNovo);
     exBlock.appendChild(header);
 
+    /* ===== SÉRIES ===== */
     const seriesList = document.createElement("div");
     seriesList.className = "series-list";
 
@@ -184,13 +224,9 @@ document.addEventListener("DOMContentLoaded", () => {
      SALVAR TREINO
   ========================= */
   btnSalvar.onclick = async () => {
-    const blocos = Array.from(exerciciosWrapper.querySelectorAll(".ex-block"));
+    const blocos = [...exerciciosWrapper.querySelectorAll(".ex-block")];
 
-    const temExercicioValido = blocos.some(
-      b => Number(b.dataset.idEx)
-    );
-
-    if (!temExercicioValido) {
+    if (!blocos.some(b => Number(b.dataset.idEx))) {
       alert("Adicione pelo menos um exercício ao treino.");
       return;
     }
@@ -210,42 +246,35 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-const inserts = [];
+    const inserts = [];
 
-blocos.forEach((block, ordem) => {
-  const idEx = Number(block.dataset.idEx);
-  if (!idEx) return;
+    blocos.forEach((block, ordem) => {
+      const idEx = Number(block.dataset.idEx);
+      if (!idEx) return;
 
-  const linhas = block.querySelectorAll(".series-row");
+      block.querySelectorAll(".series-row").forEach((row, idx) => {
+        const inputs = row.querySelectorAll("input");
 
-  linhas.forEach((row, idx) => {
-    const inputs = row.querySelectorAll("input");
-
-    inserts.push({
-      id_treino_fk: treino.id_treino,
-      id_exercicio_fk: idEx,
-      carga: inputs[0].value ? Number(inputs[0].value) : null,
-      repeticoes: inputs[1].value ? Number(inputs[1].value) : null,
-      series: idx + 1,
-      ordem_exercicio: ordem + 1,
-      unidade: "kg",
-      observacoes: row.querySelector("textarea").value || null
+        inserts.push({
+          id_treino_fk: treino.id_treino,
+          id_exercicio_fk: idEx,
+          carga: inputs[0].value ? Number(inputs[0].value) : null,
+          repeticoes: inputs[1].value ? Number(inputs[1].value) : null,
+          series: idx + 1,
+          ordem_exercicio: ordem + 1,
+          unidade: "kg",
+          observacoes: row.querySelector("textarea").value || null
+        });
+      });
     });
-  });
-});
 
-/* 🔥 CORREÇÃO 2 — trava treino vazio */
-if (!inserts.length) {
-  alert("Treino sem exercícios não pode ser salvo.");
-  await supabase
-    .from("treinos")
-    .delete()
-    .eq("id_treino", treino.id_treino);
-  return;
-}
+    if (!inserts.length) {
+      alert("Treino vazio não pode ser salvo.");
+      await supabase.from("treinos").delete().eq("id_treino", treino.id_treino);
+      return;
+    }
 
-await supabase.from("treino_exercicio").insert(inserts);
-
+    await supabase.from("treino_exercicio").insert(inserts);
 
     alert("Treino salvo!");
     window.location.href = `treinos_anteriores.html?id=${alunoId}`;
@@ -254,7 +283,7 @@ await supabase.from("treino_exercicio").insert(inserts);
   btnAddEx.onclick = createExerciseBlock;
   btnCancelar.onclick = () => window.history.back();
 
-  // INIT
+  /* INIT */
   (async () => {
     await loadCatalog();
   })();
