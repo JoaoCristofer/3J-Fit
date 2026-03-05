@@ -1,4 +1,5 @@
 import { supabase } from "./supabase.js";
+import { setAlunoAtual } from "./alunoContext.js";
 
 const params = new URLSearchParams(window.location.search);
 const id = params.get("id"); // id_aluno
@@ -107,7 +108,9 @@ btnDesempenho.onclick = () => {
   window.location.href = `desempenho.html?id=${id}`;
 };
 btnTreinos.onclick = () => {
+  setAlunoAtual(Number(id));
   window.location.href = `treinos_anteriores.html?id=${id}`;
 };
+
 
 carregarDetalhes();

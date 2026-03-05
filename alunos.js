@@ -9,9 +9,13 @@ const btnVoltar = document.getElementById("btnVoltar");
 
 btnVoltar.onclick = () => (window.location.href = "index.html");
 
-// Função para listar os alunos
+// Função para listar os alunos (ordenados por nome A → Z)
 async function carregarAlunos() {
-  const { data, error } = await supabase.from("alunos").select("*").order("id_aluno", { ascending: false });
+  const { data, error } = await supabase
+    .from("alunos")
+    .select("*")
+    .order("nome", { ascending: true }); // 👈 ordenação alfabética
+
   if (error) {
     console.error("Erro ao carregar alunos:", error);
     return;
@@ -34,7 +38,6 @@ async function carregarAlunos() {
   document.querySelectorAll(".detalhes").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       const id = e.target.dataset.id;
-      // Aqui a navegação é segura e não dá erro 404
       window.location.assign(`aluno_detalhe.html?id=${id}`);
     });
   });
@@ -56,13 +59,14 @@ form.addEventListener("submit", async (e) => {
   };
 
   const { error } = await supabase.from("alunos").insert([novoAluno]);
+
   if (error) {
     alert("Erro ao salvar aluno!");
     console.error(error);
   } else {
     modal.style.display = "none";
     form.reset();
-    carregarAlunos();
+    carregarAlunos(); // recarrega já ordenado
   }
 });
 
